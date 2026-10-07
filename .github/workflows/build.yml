@@ -1,4 +1,4 @@
-name: Build Infinity-X for Galaxy A52
+name: Build Infinity-X v4.0 (Android 17) for Galaxy A52
 
 on:
   workflow_dispatch:
@@ -25,22 +25,22 @@ jobs:
         git config --global user.name "Emik2018"
         git config --global user.email "emik2018@github.com"
 
-    - name: Download Infinity-X Source Code
+    - name: Download Infinity-X v4.0 (Android 17) Source Code
       run: |
         mkdir -p ~/infinity && cd ~/infinity
-        repo init -u https://github.com/ProjectInfinity-X/manifest -b 14 --git-lfs
+        repo init -u https://github.com/ProjectInfinity-X/manifest -b 17 --git-lfs || repo init -u https://github.com/ProjectInfinity-X/manifest -b seventeen --git-lfs
         repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
     - name: Clone A52 Trees
       run: |
         cd ~/infinity
-        git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-21 device/samsung/a52q
-        git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-21 device/samsung/sm7125-common
-        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-21 vendor/samsung/a52q
-        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-21 vendor/samsung/sm7125-common
-        git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-21 kernel/samsung/sm7125
+        git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-24.0 device/samsung/a52q || git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-22.1 device/samsung/a52q || git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-21 device/samsung/a52q
+        git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-24.0 device/samsung/sm7125-common || git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-22.1 device/samsung/sm7125-common || git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-21 device/samsung/sm7125-common
+        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-24.0 vendor/samsung/a52q || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-22.1 vendor/samsung/a52q || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-21 vendor/samsung/a52q
+        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-24.0 vendor/samsung/sm7125-common || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-22.1 vendor/samsung/sm7125-common || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-21 vendor/samsung/sm7125-common
+        git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-24.0 kernel/samsung/sm7125 || git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-22.1 kernel/samsung/sm7125 || git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-21 kernel/samsung/sm7125
 
-    - name: Compile ROM
+    - name: Compile Android 17 ROM
       run: |
         cd ~/infinity
         source build/envsetup.sh
@@ -50,5 +50,5 @@ jobs:
     - name: Save ROM Zip
       uses: actions/upload-artifact@v4
       with:
-        name: Infinity-X-Galaxy-A52
+        name: Infinity-X-v4.0-Android17-A52
         path: ~/infinity/out/target/product/a52q/*.zip
