@@ -1,0 +1,54 @@
+name: Build Infinity-X for Galaxy A52
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+
+    - name: Prepare Build Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git git-lfs gnupg gperf lib32readline-dev lib32z1-dev libelf-dev libgl1-mesa-dev libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 repo
+        git config --global user.name "Emik2018"
+        git config --global user.email "emik2018@github.com"
+
+    - name: Download Infinity-X Source Code
+      run: |
+        mkdir -p ~/infinity && cd ~/infinity
+        repo init -u https://github.com/ProjectInfinity-X/manifest -b 14 --git-lfs
+        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+    - name: Clone A52 Trees
+      run: |
+        cd ~/infinity
+        git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-21 device/samsung/a52q
+        git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-21 device/samsung/sm7125-common
+        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-21 vendor/samsung/a52q
+        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-21 vendor/samsung/sm7125-common
+        git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-21 kernel/samsung/sm7125
+
+    - name: Compile ROM
+      run: |
+        cd ~/infinity
+        source build/envsetup.sh
+        lunch infinity_a52q-userdebug || lunch lineage_a52q-userdebug
+        mka bacon -j$(nproc --all)
+
+    - name: Save ROM Zip
+      uses: actions/upload-artifact@v4
+      with:
+        name: Infinity-X-Galaxy-A52
+        path: ~/infinity/out/target/product/a52q/*.zip
