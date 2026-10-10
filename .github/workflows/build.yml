@@ -3,54 +3,93 @@ name: Build Infinity-X v4.0 (Android 17) for Galaxy A52
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    # Android source builds are very large; the standard GitHub-hosted runner
+    # may run out of disk space. This workflow is best-effort on that runner.
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-    - name: Maximize Build Space
-      uses: easimon/maximize-build-space@master
-      with:
-        root-reserve-mb: 2048
-        swap-size-mb: 1024
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-haskell: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+      - name: Maximize Build Space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 4096
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
 
-    - name: Prepare Build Environment
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git git-lfs gnupg gperf lib32readline-dev lib32z1-dev libelf-dev libgl1-mesa-dev libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 repo
-        git config --global user.name "Emik2018"
-        git config --global user.email "emik2018@github.com"
+      - name: Prepare Build Environment
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib gcc-multilib git git-lfs gnupg gperf lib32readline-dev lib32z1-dev libelf-dev libgl1-mesa-dev libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 python-is-python3
+          sudo git lfs install
+          git config --global user.name "Emik2018"
+          git config --global user.email "emik2018@users.noreply.github.com"
+          df -h
 
-    - name: Download Infinity-X v4.0 (Android 17) Source Code
-      run: |
-        mkdir -p ~/infinity && cd ~/infinity
-        repo init -u https://github.com/ProjectInfinity-X/manifest --depth=1 --git-lfs
-        repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags --depth=1
+      - name: Initialize and Sync Infinity-X Android 17
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "$HOME/infinity"
+          cd "$HOME/infinity"
+          repo init --no-repo-verify --git-lfs --depth=1 -u https://github.com/ProjectInfinity-X/manifest -b 17 -g default,-mips,-darwin,-notdefault
+          repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune --force-sync -j2
 
-    - name: Clone A52 Trees
-      run: |
-        cd ~/infinity
-        git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-22.1 --depth=1 device/samsung/a52q || git clone https://github.com/LineageOS/android_device_samsung_a52q -b lineage-21 --depth=1 device/samsung/a52q
-        git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-22.1 --depth=1 device/samsung/sm7125-common || git clone https://github.com/LineageOS/android_device_samsung_sm7125-common -b lineage-21 --depth=1 device/samsung/sm7125-common
-        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-22.1 --depth=1 vendor/samsung/a52q || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_a52q -b lineage-21 --depth=1 vendor/samsung/a52q
-        git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-22.1 --depth=1 vendor/samsung/sm7125-common || git clone https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common -b lineage-21 --depth=1 vendor/samsung/sm7125-common
-        git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-22.1 --depth=1 kernel/samsung/sm7125 || git clone https://github.com/LineageOS/android_kernel_samsung_sm7125 -b lineage-21 --depth=1 kernel/samsung/sm7125
+      - name: Fetch Android 17 A52 Device Sources
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "$HOME/infinity"
 
-    - name: Compile Android 17 ROM
-      run: |
-        cd ~/infinity
-        source build/envsetup.sh
-        lunch infinity_a52q-userdebug || lunch lineage_a52q-userdebug
-        mka bacon -j$(nproc --all)
+          git clone --depth=1 -b 17.0 https://github.com/crdroidandroid/android_device_samsung_a52q.git device/samsung/a52q
+          git clone --depth=1 -b 17.0 https://github.com/crdroidandroid/android_device_samsung_sm7125-common.git device/samsung/sm7125-common
+          git clone --depth=1 -b 17.0 https://github.com/crdroidandroid/android_kernel_samsung_sm7125.git kernel/samsung/sm7125
+          git clone --depth=1 -b 17.0 https://github.com/crdroidandroid/android_hardware_samsung.git hardware/samsung
+          git clone --depth=1 -b lineage-24.0 https://github.com/TheMuppets/proprietary_vendor_samsung_a52q.git vendor/samsung/a52q
+          git clone --depth=1 -b lineage-24.0 https://github.com/TheMuppets/proprietary_vendor_samsung_sm7125-common.git vendor/samsung/sm7125-common
+          git clone --depth=1 -b lineage-24.0 https://github.com/LineageOS/android_hardware_samsung_slsi_nfc.git hardware/samsung_slsi/nfc
 
-    - name: Save ROM Zip
-      uses: actions/upload-artifact@v4
-      with:
-        name: Infinity-X-v4.0-Android17-A52
-        path: ~/infinity/out/target/product/a52q/*.zip
+          # Adapt the crDroid/Lineage product makefile to the Infinity-X product name.
+          test -f device/samsung/a52q/lineage_a52q.mk
+          cp device/samsung/a52q/lineage_a52q.mk device/samsung/a52q/infinity_a52q.mk
+          sed -i 's/PRODUCT_NAME := lineage_a52q/PRODUCT_NAME := infinity_a52q/' device/samsung/a52q/infinity_a52q.mk
+          sed -i 's#vendor/lineage/config/common_full_phone.mk#vendor/infinity/config/common_full_phone.mk#' device/samsung/a52q/infinity_a52q.mk
+          sed -i 's/lineage_a52q.mk/infinity_a52q.mk/' device/samsung/a52q/AndroidProducts.mk
+
+          echo "Product makefile:"
+          grep -E 'PRODUCT_NAME|common_full_phone' device/samsung/a52q/infinity_a52q.mk
+          echo "AndroidProducts.mk:"
+          cat device/samsung/a52q/AndroidProducts.mk
+
+      - name: Check Device Product Configuration
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "$HOME/infinity"
+          source build/envsetup.sh
+          lunch infinity_a52q-userdebug
+
+      - name: Compile Infinity-X
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "$HOME/infinity"
+          source build/envsetup.sh
+          lunch infinity_a52q-userdebug
+          mka bacon -j2
+
+      - name: Upload ROM ZIP
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Infinity-X-v4.0-Android17-A52
+          path: /home/runner/infinity/out/target/product/a52q/*.zip
+          if-no-files-found: error
