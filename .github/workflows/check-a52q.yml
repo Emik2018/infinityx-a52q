@@ -10,28 +10,27 @@ jobs:
   check-sources:
     runs-on: ubuntu-latest
     steps:
-      - name: Check repository branches
+      - name: Check crDroid 17.0 device branches
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
 
-          check_repo() {
+          check_branch() {
             local url="$1"
+            local branch="$2"
             echo
-            echo "===== $url ====="
-            git ls-remote --heads "$url" \
-              'refs/heads/17.0' \
-              'refs/heads/lineage-23.2' \
-              'refs/heads/lineage-22.2'
-            if [ $? -ne 0 ]; then
-              echo "Could not query repository (it may be missing or inaccessible)."
+            echo "===== $url ($branch) ====="
+            if git ls-remote --exit-code --heads "$url" "refs/heads/$branch"; then
+              echo "FOUND: $branch"
+            else
+              echo "MISSING: $branch"
+              exit 1
             fi
           }
 
-          check_repo https://github.com/crdroidandroid/android_device_samsung_a52q.git
-          check_repo https://github.com/crdroidandroid/android_device_samsung_sm7125-common.git
-          check_repo https://github.com/crdroidandroid/android_kernel_samsung_sm7125.git
-          check_repo https://github.com/ProjectInfinity-X/manifest.git
-
+          check_branch https://github.com/crdroidandroid/android_device_samsung_a52q.git 17.0
+          check_branch https://github.com/crdroidandroid/android_device_samsung_sm7125-common.git 17.0
+          check_branch https://github.com/crdroidandroid/android_kernel_samsung_sm7125.git 17.0
+          check_branch https://github.com/ProjectInfinity-X/manifest.git 17
           echo
-          echo "Check finished. A blank result means the requested branch was not found.";
+          echo "All requested branches were found."
